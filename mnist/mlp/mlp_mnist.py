@@ -27,18 +27,21 @@ train_loader = torch.utils.data.DataLoader(
     dataset=train_data,
     batch_size=64,
     shuffle=True,
+    num_workers=2
 )
 
 valid_loader = torch.utils.data.DataLoader(
     dataset=valid_data,
     batch_size=64,
     shuffle=False,
+    num_workers=2
 )
 
 test_loader = torch.utils.data.DataLoader(
     dataset=test_data,
     batch_size=64,
     shuffle=False,
+    num_workers=2
 )
 
 #MLP(hidden1, 784->512->10, relu)
