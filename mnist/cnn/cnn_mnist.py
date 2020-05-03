@@ -7,14 +7,14 @@ from torch import optim
 import matplotlib.pyplot as plt
 
 train_Data = dsets.MNIST(
-    root='./data_mnist',
+    root='../data_mnist',
     train=True,
     transform=transforms.ToTensor(),
     download=True
 )
 
 test_data = dsets.MNIST(
-    root='./data_mnist',
+    root='../data_mnist',
     train=False,
     transform=transforms.ToTensor(),
     download=True
@@ -62,7 +62,8 @@ class CNN(nn.Module):
         x = F.relu(self.fc1(x))
         return self.fc2(x)
 
-net = CNN()
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+net = CNN().to(device)
 
 #loss:CrossEntropy
 criterion = nn.CrossEntropyLoss()
@@ -82,6 +83,7 @@ for epoch in range(num_epochs):
     #train
     net.train()
     for inputs, labels in train_loader:
+        inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()  #initialize
         outputs = net(inputs)  #output
         loss = criterion(outputs, labels)  #loss
@@ -97,6 +99,7 @@ for epoch in range(num_epochs):
     net.eval()
     with torch.no_grad():  #stop calculation of grad
         for inputs, labels in valid_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
             outputs = net(inputs)  #output
             loss = criterion(outputs, labels)  #loss
             val_loss += loss.item()
@@ -120,6 +123,7 @@ test_acc = 0
 net.eval()
 with torch.no_grad():
     for inputs, labels in test_loader:
+        inputs, labels = inputs.to(device), labels.to(device)
         outputs = net(inputs)
         acc = (outputs.max(1)[1] == labels).sum()
         test_acc += acc.item()
