@@ -10,14 +10,14 @@ train_Data = dsets.CIFAR10(
     root='../data_cifar10',
     train=True,
     transform=transforms.ToTensor(),
-    download=False
+    download=True
 )
 
 test_data = dsets.CIFAR10(
     root='../data_cifar10',
     train=False,
     transform=transforms.ToTensor(),
-    download=False
+    download=True
 )
 
 train_data, valid_data = torch.utils.data.random_split(train_Data, [40000, 10000])
@@ -50,19 +50,20 @@ class CNN(nn.Module):
 
     def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, 5)   #64 filters 5*5
+        self.conv1 = nn.Conv2d(3, 64, 3)   #64 filters 3*3
+        self.conv2 = nn.Conv2d(64, 64, 3)
         self.pool = nn.MaxPool2d(2)        #2*2
-        self.conv2 = nn.Conv2d(64, 256, 3) #256 filters 3*3
-        self.conv3 = nn.Conv2d(256, 256, 3)
-        self.fc1 = nn.Linear(10 * 10 * 256, 1024)
+        self.conv3 = nn.Conv2d(64, 128, 3) #128 filters 3*3
+        self.fc1 = nn.Linear(6 * 6 * 128, 1024)
         self.fc2 = nn.Linear(1024, 10)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
-        x = self.pool(x)
         x = F.relu(self.conv2(x))
+        x = self.pool(x)
         x = F.relu(self.conv3(x))
-        x = x.view(-1, 10*10*256)
+        x = self.pool(x)
+        x = x.view(-1, 6*6*128)
         x = F.relu(self.fc1(x))
         return self.fc2(x)
 
@@ -71,13 +72,13 @@ net = CNN().to(device)
 
 #loss:CrossEntropy
 criterion = nn.CrossEntropyLoss()
-#optimizer:SGD, learning rate:0.005
-optimizer = optim.SGD(net.parameters(), lr=0.0005)
+#optimizer:SGD, learning rate:0.002
+optimizer = optim.SGD(net.parameters(), lr=0.002)
 
 #training
 
 #50epochs
-num_epochs = 100
+num_epochs = 50
 
 train_loss_list, train_acc_list, val_loss_list, val_acc_list = [], [], [], []
 
@@ -155,4 +156,3 @@ plt.ylabel('acc')
 plt.title('Training and validation accuracy')
 plt.grid()
 fig_acc.savefig("cnn_cifar10_acc.png")
-
