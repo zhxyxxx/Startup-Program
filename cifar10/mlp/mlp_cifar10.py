@@ -64,7 +64,7 @@ net = MLP().to(device)
 
 #loss:CrossEntropy
 criterion = nn.CrossEntropyLoss()
-#optimizer:SGD, learning rate:0.001
+#optimizer:SGD, learning rate:0.002
 optimizer = optim.SGD(net.parameters(), lr=0.002)
 
 #training
