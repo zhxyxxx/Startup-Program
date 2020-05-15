@@ -12,7 +12,7 @@ import time
 import logging
 
 logging.basicConfig(filename='net_logger.log', level=logging.INFO)
-NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "Resnet50", "Resnet101", "Efficientnet"]
+NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "VGG_bn_nw", "Resnet50", "Resnet101", "Efficientnet"]
 
 # command line argument
 parser = argparse.ArgumentParser()
@@ -23,12 +23,13 @@ parser.add_argument('--m', type=float, default=0)
 parser.add_argument('--wd', type=float, default=0)
 parser.add_argument('--test', action='store_true')
 parser.add_argument('--load', action='store_true')
+parser.add_argument('--use32', action='store_true')
 args = parser.parse_args()
 
 model_file = args.network + "_cifar10.ckpt"
 fig_file = args.network + "_cifar10.png"
 network = NET.index(args.network)
-if network <= 1:
+if network <= 1 or args.use32:
     transform = transforms.ToTensor()
 else:
     transform = transforms.Compose([
@@ -135,10 +136,12 @@ elif network == 3:
 elif network == 4:
     net = models.vgg16_bn(num_classes=10).to(device)
 elif network == 5:
-    net = models.resnet50(num_classes=10).to(device)
+    net = models.vgg16_bn(num_classes=10, init_weights=False).to(device)
 elif network == 6:
-    net = models.resnet101(num_classes=10).to(device)
+    net = models.resnet50(num_classes=10).to(device)
 elif network == 7:
+    net = models.resnet101(num_classes=10).to(device)
+elif network == 8:
     net = EfficientNet.from_name('efficientnet-b0', override_params={'num_classes': 10}).to(device)
 else:
     print("Error")
