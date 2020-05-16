@@ -10,20 +10,21 @@ import matplotlib.pyplot as plt
 import argparse
 import time
 import logging
+import sys
 
-logging.basicConfig(filename='net_logger.log', level=logging.INFO)
-NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "VGG_bn_nw", "Resnet50", "Resnet101", "Efficientnet"]
+NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "VGG_bn_nw", "Resnet50", "Resnet101", "EfficientnetB0", "EfficientNetB1"]
 
 # command line argument
 parser = argparse.ArgumentParser()
-parser.add_argument('network', choices=NET)
-parser.add_argument('-l', '--lr', type=float, default=0.005)
-parser.add_argument('-e', '--epoch', type=int, default=50)
-parser.add_argument('--m', type=float, default=0)
-parser.add_argument('--wd', type=float, default=0)
-parser.add_argument('--test', action='store_true')
-parser.add_argument('--load', action='store_true')
-parser.add_argument('--use32', action='store_true')
+parser.add_argument('network', choices=NET, help='choose network')
+parser.add_argument('-l', '--lr', type=float, default=0.005, help='set learning rate for optimizer')
+parser.add_argument('-e', '--epoch', type=int, default=50, help='set number of epochs')
+parser.add_argument('-b', '--batch', type=int, default=64, help='set mini batch size')
+parser.add_argument('--m', type=float, default=0, help='set momentum for optimizer')
+parser.add_argument('--wd', type=float, default=0, help='set weight decay for optimizer')
+parser.add_argument('--test', action='store_true', help='test mode, with no log, model and graph output')
+parser.add_argument('--load', action='store_true', help='load your model (the file name should be *_cifar10.ckpt)')
+parser.add_argument('--use32', action='store_true', help='train with 32*32 graph size without resizing')
 args = parser.parse_args()
 
 model_file = args.network + "_cifar10.ckpt"
@@ -31,11 +32,19 @@ fig_file = args.network + "_cifar10.png"
 network = NET.index(args.network)
 if network <= 1 or args.use32:
     transform = transforms.ToTensor()
-else:
+elif network <= 8:
     transform = transforms.Compose([
         transforms.Resize((224,224)),
         transforms.ToTensor()
     ])
+elif network == 9:
+    size = EfficientNet.get_image_size('efficientnet-b1')
+    transform = transforms.Compose([
+        transforms.Resize((size,size)),
+        transforms.ToTensor()
+    ])
+else:
+    sys.exit(1)
 
 # prepare data
 train_Data = dsets.CIFAR10(
@@ -56,21 +65,21 @@ train_data, valid_data = torch.utils.data.random_split(train_Data, [40000, 10000
 
 train_loader = torch.utils.data.DataLoader(
     dataset=train_data,
-    batch_size=64,
+    batch_size=args.batch,
     shuffle=True,
     num_workers=2
 )
 
 valid_loader = torch.utils.data.DataLoader(
     dataset=valid_data,
-    batch_size=64,
+    batch_size=args.batch,
     shuffle=False,
     num_workers=2
 )
 
 test_loader = torch.utils.data.DataLoader(
     dataset=test_data,
-    batch_size=64,
+    batch_size=args.batch,
     shuffle=False,
     num_workers=2
 )
@@ -143,8 +152,10 @@ elif network == 7:
     net = models.resnet101(num_classes=10).to(device)
 elif network == 8:
     net = EfficientNet.from_name('efficientnet-b0', override_params={'num_classes': 10}).to(device)
+elif network == 9:
+    net = EfficientNet.from_name('efficientnet-b1', override_params={'num_classes': 10}).to(device)
 else:
-    print("Error")
+    sys.exit(1)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.m, weight_decay=args.wd)
@@ -221,6 +232,7 @@ with torch.no_grad():
 
 if not args.test:
     # write log
+    logging.basicConfig(filename='net_logger.log', level=logging.INFO)
     logging.info('Using {} with lr: {}, epochs: {}, m: {}, wd: {}'
             .format(args.network, args.lr, args.epoch, args.m, args.wd))
     logging.info('tl: {}'.format(train_loss_list))
