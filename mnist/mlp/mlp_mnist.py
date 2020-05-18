@@ -49,13 +49,8 @@ class MLP(nn.Module):
     '''
     def __init__(self, D_in, H, D_out):
         super(MLP, self).__init__()
-        self.l1 = nn.Linear(D_in, H)
-        self.l2 = nn.Linear(H,D_out)
-
-    def forward(self, x):
-        h = F.relu(self.l1(x))
-        y = self.l2(x)
-        return y
+        self.fc1 = nn.Linear(D_in, H)
+        self.fc2 = nn.Linear(H, D_out)
     '''
 
     def __init__(self):
