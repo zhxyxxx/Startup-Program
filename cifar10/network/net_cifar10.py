@@ -25,6 +25,7 @@ parser.add_argument('--wd', type=float, default=0, help='set weight decay for op
 parser.add_argument('--test', action='store_true', help='test mode, with no log, model and graph output')
 parser.add_argument('--load', action='store_true', help='load your model (the file name should be *_cifar10.ckpt)')
 parser.add_argument('--use32', action='store_true', help='train with 32*32 graph size without resizing')
+parser.add_argument('--para', action='store_true', help='use multi GPU')
 args = parser.parse_args()
 
 model_file = args.network + "_cifar10.ckpt"
@@ -132,30 +133,33 @@ class Lenet_r(nn.Module):
         return self.fc2(x)
 
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # choose network
 if network == 0:
-    net = Lenet().to(device)
+    net = Lenet()
 elif network == 1:
-    net = Lenet_r().to(device)
+    net = Lenet_r()
 elif network == 2:
-    net = models.mobilenet_v2(num_classes=10).to(device)
+    net = models.mobilenet_v2(num_classes=10)
 elif network == 3:
-    net = models.vgg16(num_classes=10).to(device)
+    net = models.vgg16(num_classes=10)
 elif network == 4:
-    net = models.vgg16_bn(num_classes=10).to(device)
+    net = models.vgg16_bn(num_classes=10)
 elif network == 5:
-    net = models.vgg16_bn(num_classes=10, init_weights=False).to(device)
+    net = models.vgg16_bn(num_classes=10, init_weights=False)
 elif network == 6:
-    net = models.resnet50(num_classes=10).to(device)
+    net = models.resnet50(num_classes=10)
 elif network == 7:
-    net = models.resnet101(num_classes=10).to(device)
+    net = models.resnet101(num_classes=10)
 elif network == 8:
-    net = EfficientNet.from_name('efficientnet-b0', override_params={'num_classes': 10}).to(device)
+    net = EfficientNet.from_name('efficientnet-b0', override_params={'num_classes': 10})
 elif network == 9:
-    net = EfficientNet.from_name('efficientnet-b1', override_params={'num_classes': 10}).to(device)
+    net = EfficientNet.from_name('efficientnet-b1', override_params={'num_classes': 10})
 else:
     sys.exit(1)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+if args.para and torch.cuda.device_count() > 1:
+    net = nn.DataParallel(net)
+net.to(device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.m, weight_decay=args.wd)
