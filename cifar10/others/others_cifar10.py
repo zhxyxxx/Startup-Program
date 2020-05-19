@@ -12,7 +12,7 @@ import time
 import logging
 import sys
 
-NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "VGG_bn_nw", "Resnet50", "Resnet101", "EfficientnetB0", "EfficientnetB1"]
+NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "VGG_bn_nw", "Resnet50", "Resnet101", "EfficientnetB0", "EfficientnetB1", "EfficientnetB2", "EfficientnetB3"]
 
 # command line argument
 parser = argparse.ArgumentParser()
@@ -29,6 +29,7 @@ parser.add_argument('--para', action='store_true', help='use multi GPU')
 parser.add_argument('--noise', action='store_true', help='add noise to grad')
 parser.add_argument('--lrdecay', type=int, choices=range(-1, 3), default=-1, help='use learning rate decay')
 parser.add_argument('--dr', type=float, default=0.1, help='set decay rate for learning rate')
+parser.add_argument('--smooth', action='store_true', help='use smoothout')
 args = parser.parse_args()
 
 model_file = args.network + "_cifar10.ckpt"
@@ -36,13 +37,13 @@ fig_file = args.network + "_cifar10.png"
 network = NET.index(args.network)
 if network <= 1 or args.use32:
     transform = transforms.ToTensor()
-elif network <= 8:
+elif network <= 7:
     transform = transforms.Compose([
         transforms.Resize((224,224)),
         transforms.ToTensor()
     ])
-elif network == 9:
-    size = EfficientNet.get_image_size('efficientnet-b1')
+elif network <= 11:
+    size = EfficientNet.get_image_size('efficientnet-b{}'.format(network-8))
     transform = transforms.Compose([
         transforms.Resize((size,size)),
         transforms.ToTensor()
@@ -136,7 +137,7 @@ class Lenet_r(nn.Module):
         return self.fc2(x)
 
 
-def init_weights(m):
+def init_weights(m): # init with 0
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         torch.nn.init.constant_(m.weight, 0)
         torch.nn.init.constant_(m.bias, 0)
@@ -144,7 +145,7 @@ def init_weights(m):
 # choose network
 if network == 0:
     net = Lenet()
-    net.apply(init_weights)
+    # net.apply(init_weights)
 elif network == 1:
     net = Lenet_r()
 elif network == 2:
@@ -159,17 +160,14 @@ elif network == 6:
     net = models.resnet50(num_classes=10)
 elif network == 7:
     net = models.resnet101(num_classes=10)
-elif network == 8:
-    net = EfficientNet.from_name('efficientnet-b0', override_params={'num_classes': 10})
-elif network == 9:
-    net = EfficientNet.from_name('efficientnet-b1', override_params={'num_classes': 10})
+elif network <= 11:
+    net = EfficientNet.from_name('efficientnet-b{}'.format(network-8), override_params={'num_classes': 10})
 else:
     sys.exit(1)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 if args.para and torch.cuda.device_count() > 1:
     net = nn.DataParallel(net)
 net.to(device)
-
 
 
 # add noise to grad
@@ -180,19 +178,17 @@ class SGD_with_noise(optim.SGD):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
-
         for group in self.param_groups:
             weight_decay = group['weight_decay']
             momentum = group['momentum']
             dampening = group['dampening']
             nesterov = group['nesterov']
-
             for p in group['params']:
                 if p.grad is None:
                     continue
-                sigma = 0.01 / ((1+t)**0.55)
-                noise = torch.empty_like(p.grad).normal_(mean=0, std=sigma) # grad noise
-                d_p = p.grad + noise
+                sigma = 0.01 / ((1+t)**0.55) ##
+                noise = torch.empty_like(p.grad).normal_(mean=0, std=sigma) ##
+                d_p = p.grad + noise # add noise to grad
                 if weight_decay != 0:
                     d_p = d_p.add(p, alpha=weight_decay)
                 if momentum != 0:
@@ -206,17 +202,27 @@ class SGD_with_noise(optim.SGD):
                         d_p = d_p.add(buf, alpha=momentum)
                     else:
                         d_p = buf
-
                 p.add_(d_p, alpha=-group['lr'])
         return loss
 
+@torch.no_grad()
+def add_noise(net, a, list):  # add noise to weight
+    for p in net.parameters():
+        noise = torch.empty_like(p).uniform_(-a, a)
+        p.add_(noise)
+        list.append(noise)
+
+@torch.no_grad()
+def denoise(net, list):  # remove noise from weight
+    for (p, noise) in zip(net.parameters(), list):
+        p.add_(noise, alpha=-1)
 
 criterion = nn.CrossEntropyLoss()
-if args.noise:
+if args.noise: # grad_noise
     optimizer = SGD_with_noise(net.parameters(), lr=args.lr, momentum=args.m, weight_decay=args.wd)
 else:
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.m, weight_decay=args.wd)
-
+# learning rate decay
 if args.lrdecay == 0:
     scheduler = optim.lr_scheduler.StepLR(optimizer, 3, gamma=args.dr) #reduce every a steps
 elif args.lrdecay == 1:
@@ -246,13 +252,18 @@ for epoch in range(num_epochs):
     for inputs, labels in train_loader:
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()  #initialize
+        if args.smooth:  #smoothout
+            noise_list = []
+            add_noise(net, 0.03, noise_list)
         outputs = net(inputs)  #output
         loss = criterion(outputs, labels)  #loss
         train_loss += loss.item()
         acc = (outputs.max(1)[1] == labels).sum()
         train_acc += acc.item()
         loss.backward()  #backward
-        if args.noise:
+        if args.smooth:  #smoothout
+            denoise(net, noise_list)
+        if args.noise:  #grad_noise
             optimizer.step(t=counts)  #update weight
         else:
             optimizer.step()
@@ -307,8 +318,9 @@ with torch.no_grad():
 if not args.test:
     # write log
     logging.basicConfig(filename='net_logger.log', level=logging.INFO)
-    logging.info('Using {} with lr: {}, epochs: {}, m: {}, wd: {}'
-            .format(args.network, args.lr, args.epoch, args.m, args.wd))
+    #logging.info('Using {} with lr: {}, epochs: {}, m: {}, wd: {}'
+    #        .format(args.network, args.lr, args.epoch, args.m, args.wd))
+    Logging.info(sys.argv)
     logging.info('tl: {}'.format(train_loss_list))
     logging.info('ta: {}'.format(train_acc_list))
     logging.info('vl: {}'.format(val_loss_list))
