@@ -12,7 +12,7 @@ import time
 import logging
 import sys
 
-NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "VGG_bn_nw", "Resnet50", "Resnet101", "EfficientnetB0", "EfficientNetB1"]
+NET = ["Lenet", "Lenet_r", "Mobilenet", "VGG", "VGG_bn", "VGG_bn_nw", "Resnet50", "Resnet101", "EfficientnetB0", "EfficientNetB1", "EfficientNetB2", "EfficientNetB3"]
 
 # command line argument
 parser = argparse.ArgumentParser()
@@ -33,13 +33,13 @@ fig_file = args.network + "_cifar10.png"
 network = NET.index(args.network)
 if network <= 1 or args.use32:
     transform = transforms.ToTensor()
-elif network <= 8:
+elif network <= 7:
     transform = transforms.Compose([
         transforms.Resize((224,224)),
         transforms.ToTensor()
     ])
-elif network == 9:
-    size = EfficientNet.get_image_size('efficientnet-b1')
+elif network <= 11:
+    size = EfficientNet.get_image_size('efficientnet-b{}'.format(network-8))
     transform = transforms.Compose([
         transforms.Resize((size,size)),
         transforms.ToTensor()
@@ -150,10 +150,8 @@ elif network == 6:
     net = models.resnet50(num_classes=10)
 elif network == 7:
     net = models.resnet101(num_classes=10)
-elif network == 8:
-    net = EfficientNet.from_name('efficientnet-b0', override_params={'num_classes': 10})
-elif network == 9:
-    net = EfficientNet.from_name('efficientnet-b1', override_params={'num_classes': 10})
+elif network <= 11:
+    net = EfficientNet.from_name('efficientnet-b{}'.format(network-8), override_params={'num_classes': 10})
 else:
     sys.exit(1)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
