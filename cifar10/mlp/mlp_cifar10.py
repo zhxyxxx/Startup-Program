@@ -5,19 +5,20 @@ from torch import nn
 from torch.functional import F
 from torch import optim
 import matplotlib.pyplot as plt
+import time
 
 train_Data = dsets.CIFAR10(
     root='../data_cifar10',
     train=True,
     transform=transforms.ToTensor(),
-    download=True
+    download=False
 )
 
 test_data = dsets.CIFAR10(
     root='../data_cifar10',
     train=False,
     transform=transforms.ToTensor(),
-    download=True
+    download=False
 )
 
 train_data, valid_data = torch.utils.data.random_split(train_Data, [40000, 10000])
@@ -64,17 +65,19 @@ net = MLP().to(device)
 
 #loss:CrossEntropy
 criterion = nn.CrossEntropyLoss()
-#optimizer:SGD, learning rate:0.002
-optimizer = optim.SGD(net.parameters(), lr=0.002)
+#optimizer:SGD, learning rate:0.01
+optimizer = optim.SGD(net.parameters(), lr=0.01)
 
 #training
 
-#100epochs
-num_epochs = 100
+#50epochs
+num_epochs = 50
 
 train_loss_list, train_acc_list, val_loss_list, val_acc_list = [], [], [], []
+elapsed_time = 0
 
 for epoch in range(num_epochs):
+    start = time.time()
     train_loss, train_acc, val_loss, val_acc = 0, 0, 0, 0
 
     #train
@@ -105,6 +108,7 @@ for epoch in range(num_epochs):
     avg_val_loss = val_loss / len(valid_loader.dataset)
     avg_val_acc = val_acc / len(valid_loader.dataset)
 
+    elapsed_time += time.time() - start
     print ('Epoch [{}/{}], Loss: {loss:.4f}, val_loss: {val_loss:.4f}, val_acc: {val_acc:.4f}'
                    .format(epoch+1, num_epochs, loss=avg_train_loss, val_loss=avg_val_loss, val_acc=avg_val_acc))
 
@@ -113,6 +117,9 @@ for epoch in range(num_epochs):
     train_acc_list.append(avg_train_acc)
     val_loss_list.append(avg_val_loss)
     val_acc_list.append(avg_val_acc)
+
+timeperepoch = elapsed_time / num_epochs
+print('elapsed time per epoch: {:.2f}'.format(timeperepoch))
 
 test_acc = 0
 

@@ -5,6 +5,7 @@ from torch import nn
 from torch.functional import F
 from torch import optim
 import matplotlib.pyplot as plt
+import time
 
 train_Data = dsets.MNIST(
     root='../data_mnist',
@@ -49,8 +50,13 @@ class MLP(nn.Module):
     '''
     def __init__(self, D_in, H, D_out):
         super(MLP, self).__init__()
-        self.fc1 = nn.Linear(D_in, H)
-        self.fc2 = nn.Linear(H, D_out)
+        self.l1 = nn.Linear(D_in, H)
+        self.l2 = nn.Linear(H,D_out)
+
+    def forward(self, x):
+        h = F.relu(self.l1(x))
+        y = self.l2(x)
+        return y
     '''
 
     def __init__(self):
@@ -59,6 +65,7 @@ class MLP(nn.Module):
         self.fc2 = nn.Linear(512, 10)
 
     def forward(self, x):
+        x = x.view(-1, 28*28*1)
         x = F.relu(self.fc1(x))
         return self.fc2(x)
 
@@ -67,23 +74,25 @@ net = MLP().to(device)
 
 #loss:CrossEntropy
 criterion = nn.CrossEntropyLoss()
-#optimizer:SGD, learning rate:0.01
-optimizer = optim.SGD(net.parameters(), lr=0.01)
+#optimizer:SGD, learning rate:0.04
+optimizer = optim.SGD(net.parameters(), lr=0.04)
 
 #training
 
-#50epochs
-num_epochs = 50
+#100epochs
+num_epochs = 100
 
 train_loss_list, train_acc_list, val_loss_list, val_acc_list = [], [], [], []
+elapsed_time = 0
 
 for epoch in range(num_epochs):
+    start = time.time()
     train_loss, train_acc, val_loss, val_acc = 0, 0, 0, 0
 
     #train
     net.train()
     for inputs, labels in train_loader:
-        inputs, labels = inputs.view(-1, 28*28*1).to(device), labels.to(device)
+        inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()  #initialize
         outputs = net(inputs)  #output
         loss = criterion(outputs, labels)  #loss
@@ -99,7 +108,7 @@ for epoch in range(num_epochs):
     net.eval()
     with torch.no_grad():  #stop calculation of grad
         for inputs, labels in valid_loader:
-            inputs, labels = inputs.view(-1, 28*28*1).to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
             outputs = net(inputs)  #output
             loss = criterion(outputs, labels)  #loss
             val_loss += loss.item()
@@ -108,6 +117,7 @@ for epoch in range(num_epochs):
     avg_val_loss = val_loss / len(valid_loader.dataset)
     avg_val_acc = val_acc / len(valid_loader.dataset)
 
+    elapsed_time += time.time() - start
     print ('Epoch [{}/{}], Loss: {loss:.4f}, val_loss: {val_loss:.4f}, val_acc: {val_acc:.4f}'
                    .format(epoch+1, num_epochs, loss=avg_train_loss, val_loss=avg_val_loss, val_acc=avg_val_acc))
 
@@ -117,13 +127,16 @@ for epoch in range(num_epochs):
     val_loss_list.append(avg_val_loss)
     val_acc_list.append(avg_val_acc)
 
+timeperepoch = elapsed_time / num_epochs
+print('elapsed time per epoch: {:.2f}'.format(timeperepoch))
+
 test_acc = 0
 
 #test
 net.eval()
 with torch.no_grad():
     for inputs, labels in test_loader:
-        inputs, labels = inputs.view(-1, 28*28*1).to(device), labels.to(device)
+        inputs, labels = inputs.to(device), labels.to(device)
         outputs = net(inputs)
         acc = (outputs.max(1)[1] == labels).sum()
         test_acc += acc.item()
