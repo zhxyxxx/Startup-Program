@@ -120,7 +120,6 @@ else:
 print(args[1])
 
 #training
-#16epochs
 num_epochs = 20
 
 train_loss_list, train_acc_list, val_loss_list, val_acc_list = [], [], [], []

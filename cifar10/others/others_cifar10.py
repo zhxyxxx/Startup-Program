@@ -320,7 +320,7 @@ if not args.test:
     logging.basicConfig(filename='net_logger.log', level=logging.INFO)
     #logging.info('Using {} with lr: {}, epochs: {}, m: {}, wd: {}'
     #        .format(args.network, args.lr, args.epoch, args.m, args.wd))
-    Logging.info(sys.argv)
+    logging.info(sys.argv)
     logging.info('tl: {}'.format(train_loss_list))
     logging.info('ta: {}'.format(train_acc_list))
     logging.info('vl: {}'.format(val_loss_list))
